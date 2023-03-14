@@ -109,6 +109,49 @@
     return          // []
 }
 
+#define macro ALLOWANCE() = takes(0) returns(0) {
+    // load the owner from calldataload
+    0x04            // [0x04]
+    calldataload    // [owner]
+
+    // validate the owner
+    dup1            // [owner, owner]
+    0xa0            // [0xa0, owner, owner]
+    shr             // [owner>>0xa0, owner]
+    error           // [error, owner>>0xa0, owner]
+    jumpi           // [owner]
+
+    // load the spender from calldata
+    0x24            // [0x24, owner]
+    calldataload    // [spender, owner]
+
+    // validate the spender
+    dup1            // [spender, spender, owner]
+    0xa0            // [0xa0, spender, spender, owner]
+    shr             // [spender>>0xa0, spender, owner]
+    error           // [error, spender>>0xa0, spender, owner]
+    jumpi           // [spender, owner]
+
+    // calculate the storage slot where allowance is stored
+    0x00            // [0x00, spender, owner]
+    mstore          // [owner]
+    0x20            // [0x20, owner]
+    mstore          // []
+    0x40            // [0x40]
+    0x00            // [0x00, 0x40]
+    sha3            // [slot]
+
+    // load allowance from storage and store in memory
+    sload           // [allowance]
+    0x00            // [0x00, allowance]
+    mstore          // []
+
+    // return the token allowance
+    0x20            // [0x20]
+    0x00            // [0x00, 0x20]
+    return          // []
+}
+
 #define macro MAIN() = takes(0) returns(0) {
     0x00 calldataload 0xe0 shr                          // [selector]
 
@@ -117,7 +160,8 @@
     dup1 __FUNC_SIG(decimals) eq decimals jumpi         // [selector]
 
     dup1 __FUNC_SIG(totalSupply) eq totalSupply jumpi   // [selector]
-    __FUNC_SIG(balanceOf) eq balanceOf jumpi            // []
+    dup1 __FUNC_SIG(balanceOf) eq balanceOf jumpi       // [selector]
+    __FUNC_SIG(allowance) eq allowance jumpi            // []
 
     error:
         0x00 dup1 revert                                // []
@@ -132,4 +176,6 @@
         TOTAL_SUPPLY()
     balanceOf:
         BALANCE_OF()
+    allowance:
+        ALLOWANCE()
 }
