@@ -79,16 +79,48 @@
     return      // []
 }
 
+#define macro BALANCE_OF() = takes(0) returns(0) {
+    // load the target from calldata
+    0x04            // [0x04]
+    calldataload    // [target]
+
+    // validate target
+    dup1            // [target, target]
+    0xa0            // [0xa0, target, target]
+    shr             // [target>>0xa0, target]
+    error           // [error, target>>0xa0, target]
+    jumpi           // [target]
+
+    // calculate the storage slot where token balance is stored
+    0x00            // [0x00, target]
+    mstore          // []
+    0x20            // [0x20]
+    0x00            // [0x00, 0x20]
+    sha3            // [slot]
+
+    // load token balance from storage and store in memory
+    sload           // [token_balance]
+    0x00            // [0x00, token_balance]
+    mstore          // []
+
+    // return the token balance
+    0x20            // [0x20]
+    0x00            // [0x00, 0x20]
+    return          // []
+}
+
 #define macro MAIN() = takes(0) returns(0) {
-    0x00 calldataload 0xe0 shr                      // [selector]
+    0x00 calldataload 0xe0 shr                          // [selector]
 
-    dup1 __FUNC_SIG(name) eq name jumpi             // [selector]
-    dup1 __FUNC_SIG(symbol) eq symbol jumpi         // [selector]
-    dup1 __FUNC_SIG(decimals) eq decimals jumpi     // [selector]
+    dup1 __FUNC_SIG(name) eq name jumpi                 // [selector]
+    dup1 __FUNC_SIG(symbol) eq symbol jumpi             // [selector]
+    dup1 __FUNC_SIG(decimals) eq decimals jumpi         // [selector]
 
-    __FUNC_SIG(totalSupply) eq totalSupply jumpi    // []
+    dup1 __FUNC_SIG(totalSupply) eq totalSupply jumpi   // [selector]
+    __FUNC_SIG(balanceOf) eq balanceOf jumpi            // []
 
-    0x00 dup1 revert                                // []
+    error:
+        0x00 dup1 revert                                // []
 
     name:
         NAME()
@@ -98,4 +130,6 @@
         DECIMALS()
     totalSupply:
         TOTAL_SUPPLY()
+    balanceOf:
+        BALANCE_OF()
 }
