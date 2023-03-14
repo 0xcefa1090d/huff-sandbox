@@ -20,6 +20,11 @@
 #define event Deposit(address,uint256)
 #define event Withdrawl(address,uint256)
 
+/* Constant Definitions */
+#define constant INTERNAL_MPTR_OWNER = 0x60
+#define constant INTERNAL_MPTR_SPENDER = 0x80
+#define constant INTERNAL_MPTR_VALUE = 0xa0
+
 /* Macro Definitions */
 #define macro NAME() = takes(0) returns(0) {
     // store string offset in memory
@@ -156,52 +161,77 @@
     // load the spender from calldata
     0x20                    // [0x20]
     0x04                    // [0x04, 0x20]
-    0x00                    // [0x00, 0x04, 0x20]
+    [INTERNAL_MPTR_SPENDER] // [INTERNAL_MPTR_SPENDER, 0x04, 0x20]
     calldatacopy            // []
-    0x00                    // [0x00]
+    [INTERNAL_MPTR_SPENDER] // [INTERNAL_MPTR_SPENDER]
     mload                   // [spender]
 
     // validate the spender
-    dup1                    // [spender, spender]
-    0xa0                    // [0xa0, spender, spender]
-    shr                     // [spender>>0xa0, spender]
-    error                   // [error, spender>>0xa0, spender]
-    jumpi                   // [spender]
-
-    // calculate the storage slot where allowance is stored
-    caller                  // [owner, spender]
-    0x20                    // [0x20, owner, spender]
-    mstore                  // [spender]
-    0x40                    // [0x40, spender]
-    0x00                    // [0x00, 0x40, spender]
-    sha3                    // [slot, spender]
+    dup1                    // [spender]
+    0xa0                    // [0xa0, spender]
+    shr                     // [spender>>0xa0]
+    error                   // [error, spender>>0xa0]
+    jumpi                   // []
 
     // load the approval amount from calldata
-    0x20                    // [0x20, slot, spender]
-    0x24                    // [0x24, 0x20, slot, spender]
-    0x00                    // [0x00, 0x24, 0x20, slot, spender]
-    calldatacopy            // [slot, spender]
-    0x00                    // [0x00, slot, spender]
-    mload                   // [amount, slot, spender]
+    0x20                    // [0x20]
+    0x24                    // [0x24, 0x20]
+    [INTERNAL_MPTR_VALUE]   // [INTERNAL_MPTR_VALUE, 0x24, 0x20]
+    calldatacopy            // []
 
-    // store amount in storage
-    swap1                   // [slot, amount, spender]
-    sstore                  // [spender]
+    // store the owner in memory
+    caller                  // [owner]
+    [INTERNAL_MPTR_OWNER]   // [INTERNAL_MPTR_OWNER, owner]
+    mstore                  // []
 
-    // log Approval
-    caller                  // [owner, spender]
-    __EVENT_HASH(Approval)  // [approval_sig, owner, spender]
-    0x20                    // [0x20, approval_sig, owner, spender]
-    0x00                    // [0x00, 0x20, approval_sig, owner, spender]
-    log3                    // []
+    // jump to internal approve
+    external_approve_return // [external_approve_return_jumpdest]
+    internal_approve        // [internal_approve_jumpdest, external_approve_return_jumpdest]
+    jump                    // []
 
     // return true
+    external_approve_return:
     0x01                    // [0x01]
     0x00                    // [0x00, 0x01]
     mstore                  // []
     0x20                    // [0x20]
     0x00                    // [0x00, 0x20]
     return                  // []
+}
+
+#define macro INTERNAL_APPROVE() = takes(1) returns(0) {
+    // stack: [return_jumpdest]
+
+    // load the value
+    [INTERNAL_MPTR_VALUE]   // [INTERNAL_MPTR_VALUE, return_jumpdest]
+    mload                   // [value, return_jumpdest]
+
+    // calculate storage slot and store amount
+    [INTERNAL_MPTR_SPENDER] // [INTERNAL_MPTR_SPENDER, value, return_jumpdest]
+    mload                   // [spender, value, return_jumpdest]
+    0x00                    // [0x00, spender, value, return_jumpdest]
+    mstore                  // [value, return_jumpdest]
+    [INTERNAL_MPTR_OWNER]   // [INTERNAL_MPTR_OWNER, value, return_jumpdest]
+    mload                   // [owner, value, return_jumpdest]
+    0x20                    // [0x20, owner, value, return_jumpdest]
+    mstore                  // [value, return_jumpdest]
+    0x40                    // [0x40, value, return_jumpdest]
+    0x00                    // [0x00, 0x40, value, return_jumpdest]
+    sha3                    // [slot, value, return_jumpdest]
+    sstore                  // return_jumpdest]
+
+    // log Approval event
+    [INTERNAL_MPTR_SPENDER] // [INTERNAL_MPTR_SPENDER, return_jumpdest]
+    mload                   // [spender, return_jumpdest]
+    [INTERNAL_MPTR_OWNER]   // [INTERNAL_MPTR_OWNER, spender, return_jumpdest]
+    mload                   // [owner, spender, return_jumpdest]
+    __EVENT_HASH(Approval)  // [approval_sig, owner, spender, return_jumpdest]
+    0x20                    // [0x20, approval_sig, owner, spender, return_jumpdest]
+    [INTERNAL_MPTR_VALUE]   // [INTERNAL_MPTR_SPENDER, 0x20, approval_sig, owner, spender, return_jumpdest]
+    log3                    // [return_jumpdest]
+
+    // jump back
+    jump                    // []
 }
 
 #define macro MAIN() = takes(0) returns(0) {
@@ -234,4 +264,7 @@
         ALLOWANCE()
     approve:
         APPROVE()
+
+    internal_approve:
+        INTERNAL_APPROVE()
 }
