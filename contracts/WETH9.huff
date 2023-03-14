@@ -67,14 +67,28 @@
     return  // []
 }
 
+#define macro TOTAL_SUPPLY() = takes(0) returns(0) {
+    // store current ether balance in memory
+    selfbalance // [selfbalance]
+    0x00        // [0x00, selfbalance]
+    mstore      // []
+
+    // return the current ether balance
+    0x20        // [0x20]
+    0x00        // [0x00, 0x20]
+    return      // []
+}
+
 #define macro MAIN() = takes(0) returns(0) {
-    0x00 calldataload 0xe0 shr              // [selector]
+    0x00 calldataload 0xe0 shr                      // [selector]
 
-    dup1 __FUNC_SIG(name) eq name jumpi     // [selector]
-    dup1 __FUNC_SIG(symbol) eq symbol jumpi // [selector]
-    __FUNC_SIG(decimals) eq decimals jumpi  // []
+    dup1 __FUNC_SIG(name) eq name jumpi             // [selector]
+    dup1 __FUNC_SIG(symbol) eq symbol jumpi         // [selector]
+    dup1 __FUNC_SIG(decimals) eq decimals jumpi     // [selector]
 
-    0x00 dup1 revert                        // []
+    __FUNC_SIG(totalSupply) eq totalSupply jumpi    // []
+
+    0x00 dup1 revert                                // []
 
     name:
         NAME()
@@ -82,4 +96,6 @@
         SYMBOL()
     decimals:
         DECIMALS()
+    totalSupply:
+        TOTAL_SUPPLY()
 }
