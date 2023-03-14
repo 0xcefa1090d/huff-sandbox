@@ -24,6 +24,7 @@
 #define constant INTERNAL_MPTR_OWNER = 0x60
 #define constant INTERNAL_MPTR_SPENDER = 0x80
 #define constant INTERNAL_MPTR_VALUE = 0xa0
+#define constant INTERNAL_MPTR_RECEIVER = 0xc0
 
 /* Macro Definitions */
 #define macro NAME() = takes(0) returns(0) {
@@ -234,6 +235,72 @@
     jump                    // []
 }
 
+#define macro INTERNAL_TRANSFER() = takes(1) returns(0) {
+    // stack: [return_jumpdest]
+
+    // load the owner value
+    0x20                        // [0x20]
+    [INTERNAL_MPTR_OWNER]       // [INTERNAL_MPTR_OWNER, 0x20]
+    sha3                        // [slot]
+    sload                       // [owner_balance]
+
+    // load the transfer value
+    [INTERNAL_MPTR_VALUE]       // [INTERNAL_MPTR_VALUE, owner_balance]
+    mload                       // [value, owner_balance]
+
+    // validate there is no underflow require(new_balance<=owner_balance)
+    dup2                        // [owner_balance, value, owner_balance]
+    sub                         // [new_balance, owner_balance]
+    dup1                        // [new_balance, new_balance, owner_balance]
+    swap2                       // [owner_balance, new_balance, new_balance]
+    lt                          // [owner_balance<new_balance, new_balance]
+    error                       // [error, owner_balance<new_balance, new_balance]
+    jumpi                       // [new_balance]
+
+    // store new balance in owner slot
+    0x20                        // [0x20, new_balance]
+    [INTERNAL_MPTR_OWNER]       // [INTERNAL_MPTR_OWNER, 0x20, new_balance]
+    sha3                        // [slot, new_balance]
+    sstore                      // []
+
+    // load the receiver value
+    0x20                        // [0x20]
+    [INTERNAL_MPTR_RECEIVER]    // [INTERNAL_MPTR_RECEIVER, 0x20]
+    sha3                        // [slot]
+    sload                       // [receiver_balance]
+
+    // load the transfer value
+    [INTERNAL_MPTR_VALUE]       // [INTERNAL_MPTR_VALUE, receiver_balance]
+    mload                       // [value, receiver_balance]
+
+    // validate there is no overflow require(new_balance>=receiver_balance)
+    dup2                        // [receiver_balance, value, receiver_balance]
+    add                         // [new_balance, receiver_balance]
+    dup1                        // [new_balance, new_balance, receiver_balance]
+    swap2                       // [receiver_balance, new_balance, new_balance]
+    gt                          // [receiver_balance>new_balance, new_balance]
+    error                       // [error, receiver_balance>new_balance, new_balance]
+    jumpi                       // [new_balance]
+
+    // store new balance in receiver slot
+    0x20                        // [0x20, new_balance]
+    [INTERNAL_MPTR_RECEIVER]    // [INTERNAL_MPTR_RECEIVER, 0x20, new_balance]
+    sha3                        // [slot, new_balance]
+    sstore                      // []
+
+    // fire Transfer event
+    [INTERNAL_MPTR_RECEIVER]    // [INTERNAL_MPTR_RECEIVER]
+    mload                       // [receiver]
+    [INTERNAL_MPTR_OWNER]       // [INTERNAL_MPTR_OWNER, receiver]
+    mload                       // [owner, receiver]
+    __EVENT_HASH(Transfer)      // [transfer_topic, owner, receiver]
+    0x20                        // [0x20, transfer_topic, owner, receiver]
+    [INTERNAL_MPTR_VALUE]       // [INTERNAL_MPTR_VALUE, 0x20, transfer_topic, owner, receiver]
+    log3                        // []
+
+    jump                        // []
+}
+
 #define macro MAIN() = takes(0) returns(0) {
     0x00 calldataload 0xe0 shr                          // [selector]
 
@@ -267,4 +334,6 @@
 
     internal_approve:
         INTERNAL_APPROVE()
+    internal_transfer:
+        INTERNAL_TRANSFER()
 }
