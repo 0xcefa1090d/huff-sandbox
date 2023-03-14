@@ -152,6 +152,58 @@
     return          // []
 }
 
+#define macro APPROVE() = takes(0) returns(0) {
+    // load the spender from calldata
+    0x20                    // [0x20]
+    0x04                    // [0x04, 0x20]
+    0x00                    // [0x00, 0x04, 0x20]
+    calldatacopy            // []
+    0x00                    // [0x00]
+    mload                   // [spender]
+
+    // validate the spender
+    dup1                    // [spender, spender]
+    0xa0                    // [0xa0, spender, spender]
+    shr                     // [spender>>0xa0, spender]
+    error                   // [error, spender>>0xa0, spender]
+    jumpi                   // [spender]
+
+    // calculate the storage slot where allowance is stored
+    caller                  // [owner, spender]
+    0x20                    // [0x20, owner, spender]
+    mstore                  // [spender]
+    0x40                    // [0x40, spender]
+    0x00                    // [0x00, 0x40, spender]
+    sha3                    // [slot, spender]
+
+    // load the approval amount from calldata
+    0x20                    // [0x20, slot, spender]
+    0x24                    // [0x24, 0x20, slot, spender]
+    0x00                    // [0x00, 0x24, 0x20, slot, spender]
+    calldatacopy            // [slot, spender]
+    0x00                    // [0x00, slot, spender]
+    mload                   // [amount, slot, spender]
+
+    // store amount in storage
+    swap1                   // [slot, amount, spender]
+    sstore                  // [spender]
+
+    // log Approval
+    caller                  // [owner, spender]
+    __EVENT_HASH(Approval)  // [approval_sig, owner, spender]
+    0x20                    // [0x20, approval_sig, owner, spender]
+    0x00                    // [0x00, 0x20, approval_sig, owner, spender]
+    log3                    // []
+
+    // return true
+    0x01                    // [0x01]
+    0x00                    // [0x00, 0x01]
+    mstore                  // []
+    0x20                    // [0x20]
+    0x00                    // [0x00, 0x20]
+    return                  // []
+}
+
 #define macro MAIN() = takes(0) returns(0) {
     0x00 calldataload 0xe0 shr                          // [selector]
 
@@ -161,7 +213,9 @@
 
     dup1 __FUNC_SIG(totalSupply) eq totalSupply jumpi   // [selector]
     dup1 __FUNC_SIG(balanceOf) eq balanceOf jumpi       // [selector]
-    __FUNC_SIG(allowance) eq allowance jumpi            // []
+    dup1 __FUNC_SIG(allowance) eq allowance jumpi       // [selector]
+
+    __FUNC_SIG(approve) eq approve jumpi                // []
 
     error:
         0x00 dup1 revert                                // []
@@ -178,4 +232,6 @@
         BALANCE_OF()
     allowance:
         ALLOWANCE()
+    approve:
+        APPROVE()
 }
