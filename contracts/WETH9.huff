@@ -168,7 +168,6 @@
     mload                   // [spender]
 
     // validate the spender
-    dup1                    // [spender]
     0xa0                    // [0xa0, spender]
     shr                     // [spender>>0xa0]
     error                   // [error, spender>>0xa0]
@@ -198,6 +197,46 @@
     0x20                    // [0x20]
     0x00                    // [0x00, 0x20]
     return                  // []
+}
+
+#define macro TRANSFER() = takes(0) returns(0) {
+    // load the calldata into memory
+    0x20                        // [0x20]
+    0x04                        // [0x04, 0x20]
+    [INTERNAL_MPTR_RECEIVER]    // [INTERNAL_MPTR_RECEIVER, 0x04, 0x20]
+    calldatacopy                // []
+
+    0x20                        // [0x20]
+    0x24                        // [0x24, 0x20]
+    [INTERNAL_MPTR_VALUE]       // [value_ptr, 0x24, 0x20]
+    calldatacopy                // []
+
+    // load the spender and validate it
+    [INTERNAL_MPTR_RECEIVER]    // [INTERNAL_MPTR_RECEIVER]
+    mload                       // [spender]
+    0xa0                        // [0xa0, spender]
+    shr                         // [spender>>0xa0]
+    error                       // [error, spender>>0xa0]
+    jumpi                       // []
+
+    // store the caller in memory
+    caller                      // [caller]
+    [INTERNAL_MPTR_OWNER]       // [INTERNAL_MPTR_OWNER, caller]
+    mstore                      // []
+
+    // jump to internal transfer
+    external_approve_return     // [external_approve_return]
+    internal_transfer           // [internal_transfer, external_approve_return]
+    jump                        // []
+
+    // return true
+    external_transfer_return:
+    0x01                        // [0x01]
+    0x00                        // [0x00, 0x01]
+    mstore                      // []
+    0x20                        // [0x20]
+    0x00                        // [0x00, 0x20]
+    return                      // []
 }
 
 #define macro INTERNAL_APPROVE() = takes(1) returns(0) {
@@ -312,7 +351,8 @@
     dup1 __FUNC_SIG(balanceOf) eq balanceOf jumpi       // [selector]
     dup1 __FUNC_SIG(allowance) eq allowance jumpi       // [selector]
 
-    __FUNC_SIG(approve) eq approve jumpi                // []
+    dup1 __FUNC_SIG(approve) eq approve jumpi           // [selector]
+    __FUNC_SIG(transfer) eq transfer jumpi              // []
 
     error:
         0x00 dup1 revert                                // []
@@ -331,6 +371,8 @@
         ALLOWANCE()
     approve:
         APPROVE()
+    transfer:
+        TRANSFER()
 
     internal_approve:
         INTERNAL_APPROVE()
