@@ -422,6 +422,16 @@
 
     0x00
     dup1
+    dup1
+    dup1
+    dup1
+    mload
+    caller
+    gas
+    call
+
+    0x00
+    dup1
     return
 }
 
