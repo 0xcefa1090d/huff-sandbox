@@ -329,6 +329,51 @@
     return                      // []
 }
 
+#define macro DEPOSIT() = takes(0) returns(0) {
+    // require(callvalue != 0)
+    callvalue
+    iszero
+    error
+    jumpi
+
+    caller
+    0x00
+    mstore
+
+    0x20
+    0x00
+    sha3        // [slot]
+
+    dup1        // [slot, slot]
+    sload       // [caller_balance, slot]
+
+    dup1        // [caller_balance, caller_balance, slot]
+    callvalue   // [callvalue, caller_balance, caller_balance, slot]
+    add         // [new_balance, caller_balance, slot]
+    dup1        // [new_balance, new_balance, caller_balance, slot]
+    swap2       // [caller_balance, new_balance, new_balance, slot]
+    gt          // [caller_balance>new_balance, new_balance, slot]
+    error
+    jumpi
+
+    swap1
+    sstore
+
+    callvalue
+    0x00
+    mstore
+
+    caller
+    __EVENT_HASH(Deposit)
+    0x20
+    0x00
+    log2
+
+    0x00
+    dup1
+    return
+}
+
 #define macro INTERNAL_APPROVE() = takes(1) returns(0) {
     // stack: [return_jumpdest]
 
@@ -431,7 +476,13 @@
 }
 
 #define macro MAIN() = takes(0) returns(0) {
+    calldatasize iszero deposit jumpi
+
     0x00 calldataload 0xe0 shr                          // [selector]
+
+    dup1 __FUNC_SIG(deposit) eq deposit jumpi           // [selector]
+
+    callvalue error jumpi
 
     dup1 __FUNC_SIG(name) eq name jumpi                 // [selector]
     dup1 __FUNC_SIG(symbol) eq symbol jumpi             // [selector]
@@ -444,6 +495,7 @@
     dup1 __FUNC_SIG(approve) eq approve jumpi           // [selector]
     dup1 __FUNC_SIG(transfer) eq transfer jumpi         // [selector]
     dup1 __FUNC_SIG(transferFrom) eq transferFrom jumpi // [selector]
+
 
     error:
         0x00 dup1 revert                                // [selector]
@@ -466,6 +518,8 @@
         TRANSFER()
     transferFrom:
         TRANSFER_FROM()
+    deposit:
+        DEPOSIT()
 
     internal_approve:
         INTERNAL_APPROVE()
