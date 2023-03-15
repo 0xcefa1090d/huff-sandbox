@@ -374,6 +374,57 @@
     return
 }
 
+#define macro WITHDRAW() = takes(0) returns(0) {
+    caller
+    0x00
+    mstore
+
+    0x20
+    0x00
+    sha3        // [slot]
+
+    dup1        // [slot, slot]
+    sload       // [balance, slot]
+
+    0x20
+    0x04
+    0x00
+    calldatacopy
+
+    0x00
+    mload       // [amount, balance, slot]
+
+    dup2
+    dup2        // [amount, balance, amount, balance, slot]
+    eq
+    success
+    jumpi       // [amount, balance, slot]
+
+    dup2
+    dup2
+    lt
+    success
+    jumpi
+
+    error
+    jump
+
+    success: // [amount, balance, slot]
+    sub     // [new_balance, slot]
+    swap1
+    sstore
+
+    caller
+    __EVENT_HASH(Withdrawl)
+    0x20
+    0x00
+    log2
+
+    0x00
+    dup1
+    return
+}
+
 #define macro INTERNAL_APPROVE() = takes(1) returns(0) {
     // stack: [return_jumpdest]
 
@@ -495,7 +546,7 @@
     dup1 __FUNC_SIG(approve) eq approve jumpi           // [selector]
     dup1 __FUNC_SIG(transfer) eq transfer jumpi         // [selector]
     dup1 __FUNC_SIG(transferFrom) eq transferFrom jumpi // [selector]
-
+    __FUNC_SIG(withdraw) eq withdraw jumpi              // []
 
     error:
         0x00 dup1 revert                                // [selector]
@@ -520,6 +571,8 @@
         TRANSFER_FROM()
     deposit:
         DEPOSIT()
+    withdraw:
+        WITHDRAW()
 
     internal_approve:
         INTERNAL_APPROVE()
