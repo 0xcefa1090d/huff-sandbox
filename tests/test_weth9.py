@@ -67,3 +67,24 @@ def test_approval(alice, bob, weth9):
     weth9.approve(bob, 10**18, sender=alice)
 
     assert weth9.allowance(alice, bob) == 10**18
+
+
+def test_transfer_from(alice, bob, weth9, setup):
+    weth9.approve(bob, 10**18, sender=alice)
+
+    weth9.transferFrom(alice, bob, 10**18, sender=bob)
+
+    assert weth9.balanceOf(alice) == 0
+    assert weth9.balanceOf(bob) == 10**18
+
+
+def test_transfer_from_insufficient_balance(alice, bob, weth9, setup):
+    weth9.approve(bob, 10**18, sender=alice)
+
+    with ape.reverts():
+        weth9.transferFrom(alice, bob, 10**19, sender=bob)
+
+
+def test_transfer_from_insufficient_allowance(alice, bob, weth9, setup):
+    with ape.reverts():
+        weth9.transferFrom(alice, bob, 10**18, sender=bob)
