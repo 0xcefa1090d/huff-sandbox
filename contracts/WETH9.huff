@@ -239,6 +239,96 @@
     return                      // []
 }
 
+#define macro TRANSFER_FROM() = takes(0) returns(0) {
+    // load owner into memory
+    0x20                        // [0x20]
+    0x04                        // [0x04, 0x20]
+    [INTERNAL_MPTR_OWNER]       // [owner_ptr, 0x04, 0x20]
+    calldatacopy
+
+    // validate the owner
+    [INTERNAL_MPTR_OWNER]       // [owner_ptr]
+    mload                       // [owner]
+    0xa0                        // [0xa0, owner]
+    shr                         // [owner>>0xa0]
+    error                       // [error, owner>>0xa0]
+    jumpi                       // []
+
+    // load the receiver into memory
+    0x20                        // [0x20]
+    0x24                        // [0x24, 0x20]
+    [INTERNAL_MPTR_RECEIVER]    // [receiver_ptr, 0x24, 0x20]
+    calldatacopy                // []
+
+    // validate the receiver
+    [INTERNAL_MPTR_RECEIVER]    // [receiver_ptr]
+    mload                       // [receiver]
+    0xa0                        // [0xa0, receiver]
+    shr                         // [receiver>>0xa0]
+    error                       // [error, receiver>>0xa0]
+    jumpi                       // []
+
+    // load the value into memory
+    0x20                        // [0x20]
+    0x44                        // [0x44, 0x20]
+    [INTERNAL_MPTR_VALUE]       // [value_ptr, 0x44, 0x20]
+    calldatacopy                // []
+
+    // transfer subroutine
+    external_transfer_from_return_1
+    internal_transfer
+    jump
+
+    // validate the approval of the caller
+    external_transfer_from_return_1:
+    [INTERNAL_MPTR_SPENDER]
+    caller
+    mstore
+
+    // calculate allowance slot
+    0x00
+    caller
+    mstore
+
+    // load the owner and store in memory for slot calc
+    0x20
+    [INTERNAL_MPTR_OWNER]
+    mload
+    mstore
+
+    0x40
+    0x00
+    sha3
+    sload                       // [allowance]
+
+    [INTERNAL_MPTR_VALUE]
+    mload                       // [value, allowance]
+    dup2                        // [allowance, value, allowance]
+    sub                         // [new_allowance, allowance]
+    dup1                        // [new_allowance, new_allowance, allowance]
+    swap2                       // [allowance, new_allowance, new_allowance]
+    lt                          // [allowance<new_allowance, new_allowance]
+    error                       // [error, new_allowance>allowance, new_allowance]
+    jumpi                       // [new_allowance]
+
+    // store new_allowance in value slot
+    [INTERNAL_MPTR_VALUE]
+    mstore
+
+    external_transfer_from_return_2
+    internal_approve
+    jump
+
+    // return true
+    external_transfer_from_return_2:
+    0x01                        // [0x01]
+    0x00                        // [0x00, 0x01]
+    mstore                      // []
+    0x20                        // [0x20]
+    0x00                        // [0x00, 0x20]
+    return                      // []
+}
+
 #define macro INTERNAL_APPROVE() = takes(1) returns(0) {
     // stack: [return_jumpdest]
 
@@ -352,10 +442,11 @@
     dup1 __FUNC_SIG(allowance) eq allowance jumpi       // [selector]
 
     dup1 __FUNC_SIG(approve) eq approve jumpi           // [selector]
-    __FUNC_SIG(transfer) eq transfer jumpi              // []
+    dup1 __FUNC_SIG(transfer) eq transfer jumpi         // [selector]
+    dup1 __FUNC_SIG(transferFrom) eq transferFrom jumpi // [selector]
 
     error:
-        0x00 dup1 revert                                // []
+        0x00 dup1 revert                                // [selector]
 
     name:
         NAME()
@@ -373,6 +464,8 @@
         APPROVE()
     transfer:
         TRANSFER()
+    transferFrom:
+        TRANSFER_FROM()
 
     internal_approve:
         INTERNAL_APPROVE()
